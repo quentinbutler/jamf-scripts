@@ -1,0 +1,30 @@
+#################################################################
+# Name:     Clear Cache & Restart Firefox
+# Purpose:  Script to clear cache & restart browser 
+#           
+# This can be used as a self-service tool. 
+#           
+#
+# Modified By:   Quentin Butler
+# Date:          01.13.2021
+#################################################################
+
+
+#!/bin/sh
+
+
+#Clear Cache
+sudo rm -Rf ~/Library/Caches/Firefox/profiles/*/cache2
+
+#Close Firefox
+sudo killall firefox
+
+
+#Wait 5 seconds
+sleep 5
+
+
+#Launch Firefox
+sudo open -a "Firefox"
+
+
