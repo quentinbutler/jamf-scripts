@@ -1,0 +1,92 @@
+#!/bin/bash
+
+#################################################################
+# Name:     Set computer, host, and localhost names
+# Purpose:  Sets computer name, hostname, localhost names based on
+#           the currently logged-in user's macOS first and last name.
+#
+#           The format will be: <first name>-<last name>_company_mac.
+#           This script is designed to be run on a recurring interval
+#           and will not make changes to computer, host, or localhost
+#           names if they are already following the perscribed naming
+#           convention set by this script.
+#
+# Modified By:   Quentin Butler
+# Date:          12.22.2021
+#################################################################
+
+# a user to be whitelisted from renaming, such as a local admin user
+# parameterized for use in Jamf Pro
+whitelistedUser="$4"
+
+# determine logged-in user and assign it to a variable
+loggedInUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
+
+# determine logged in user's name from macOS directory
+loggedInUserName=$(id -F "$loggedInUser" | sed 's/ /-/g' | tr '[:upper:]' '[:lower:]')
+
+# testing variable
+#whitelistedUser="localadmin"
+
+# exit script if $loggedInUser is root, _mbsetupuser, or the whitelisted user
+if [[ "$loggedInUser" == "root" ]] || [[ "$loggedInUser" == "_mbsetupuser" ]] || [[ "$loggedInUser" == "$whitelistedUser" ]]; then
+  echo "The current logged in user is: $loggedInUser"
+  echo "Computer, host, and localhost names will not be evalutated and set at this time"
+  echo "These actions will be attempted again at the next run interval"
+  echo "Exiting..."
+  exit 0
+fi
+
+# $fixedCN will be the new computer name
+fixedCN=$(echo `echo $loggedInUserName`_company_mac)
+
+# set host and local host names using $fixedCN
+# replace _ with - for host name and localhost name (_ not allowed in host names)
+fixedHN=$(echo "$fixedCN" | sed 's/_/-/g')
+fixedLHN=$(echo "$fixedCN" | sed 's/_/-/g')
+
+
+# run checks to test if naming conventions are already compliant with perscribed convention
+if [[ "$(scutil --get ComputerName)" == "$fixedCN" ]]; then
+  echo "The current computer name, $fixedCN, complies with the naming convention. Checking hostname..."
+  if [[ "$(scutil --get HostName)" == "$fixedHN" ]]; then
+    echo "The current hostname, $fixedHN, complies with the naming convention. Checking localhost name..."
+    if [[ "$(scutil --get LocalHostName)" == "$fixedLHN" ]]; then
+      echo "The current localhost name, $fixedLHN, complies with the naming convention"
+      echo "Computer name, hostname, and localhost name for this computer are all set correctly"
+      echo "Exiting..."
+      exit 0
+    fi
+  fi
+fi
+
+# if computer, host, or localhost names are not within compliance, set accordingly
+
+# set computer name
+if [[ "$(scutil --get ComputerName)" != "$fixedCN" ]]; then
+  echo "Current computer name name is:" $(scutil --get ComputerName)
+  scutil --set ComputerName $fixedCN
+  echo "Corrected computer name is:" $(scutil --get ComputerName)
+fi
+# set host name
+if [[ "$(scutil --get HostName)" != "$fixedHN" ]]; then
+  echo "Current host name name is:" $(scutil --get HostName)
+  scutil --set HostName $fixedHN
+  echo "Corrected host name is:" $(scutil --get HostName)
+fi
+# set localhost name
+if [[ "$(scutil --get LocalHostName)" != "$fixedLHN" ]]; then
+  echo "Current local host name name is:" $(scutil --get LocalHostName)
+  scutil --set LocalHostName $fixedLHN
+  echo "Corrected local host name is:" $(scutil --get LocalHostName)
+fi
+
+# flush DNS chache (specific to macOS 10.10+)
+killall -HUP mDNSResponder
+killall mDNSResponderHelper
+dscacheutil -flushcache
+
+# run jamf recon
+jamf recon
+
+exit 0
