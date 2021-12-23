@@ -1,0 +1,26 @@
+#################################################################
+# Name:     Clear Cache & Restart Google Chrome
+# Purpose:  Script to clear cache & restart browser 
+#           
+# This can be used as a self-service tool. 
+#           
+#
+# Modified By:   Quentin Butler
+# Date:          01.13.2021
+#################################################################
+
+#!/bin/sh
+
+#Clear Cache
+sudo rm -Rf ~/Library/Caches/Google/Chrome/
+
+#Close Google Chrome
+sudo killall Google\ Chrome
+
+
+#Wait 5 seconds
+sleep 10
+
+
+#Launch Google Chrome
+sudo open -a "Google Chrome"
